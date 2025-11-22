@@ -23,13 +23,14 @@ export default function MobileRouteChoice({ onChoose }: MobileRouteChoiceProps) 
             <img
               src="/logo.png"
               alt="Starterbox"
-              className="h-24 w-auto"
+              className="h-28 sm:h-32 w-auto drop-shadow-2xl"
+              onError={(e) => console.error('Logo failed to load on mobile route choice:', e)}
             />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
             Welcome to Starterbox
           </h1>
-          <p className="text-gray-300 text-lg">
+          <p className="text-gray-300 text-base sm:text-lg">
             How would you like to start?
           </p>
         </div>

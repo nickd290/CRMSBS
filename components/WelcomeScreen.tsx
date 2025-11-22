@@ -46,8 +46,9 @@ export default function WelcomeScreen({ onDismiss }: WelcomeScreenProps) {
           <img
             src="/logo.png"
             alt="Starterbox Studios"
-            className="h-24 md:h-32 w-auto animate-pulse"
+            className="h-32 sm:h-40 md:h-48 w-auto animate-pulse drop-shadow-2xl"
             style={{ animationDuration: '2s' }}
+            onError={(e) => console.error('Logo failed to load:', e)}
           />
         </div>
 

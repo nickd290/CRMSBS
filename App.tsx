@@ -17,7 +17,7 @@ import { PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen, Menu } 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [mobileChoice, setMobileChoice] = useState<'chat' | 'dashboard' | null>(() => {
     // Desktop users bypass mobile choice
@@ -52,6 +52,9 @@ const App: React.FC = () => {
     if (choice === 'chat') {
       setIsChatOpen(true);
       setIsSidebarCollapsed(true); // Hide sidebar on mobile for chat-first experience
+    } else {
+      setIsChatOpen(false);
+      setIsSidebarCollapsed(false); // Show sidebar for dashboard
     }
   };
 
@@ -69,7 +72,7 @@ const App: React.FC = () => {
       {/* Welcome Screen */}
       {showWelcome && <WelcomeScreen onDismiss={handleWelcomeDismiss} />}
 
-      <div className="flex h-screen overflow-hidden bg-gray-100 font-sans text-sm">
+      <div className="flex min-h-screen md:h-screen md:overflow-hidden bg-gray-100 font-sans text-sm">
         {/* Mobile Sidebar Backdrop */}
         {!isSidebarCollapsed && (
           <div

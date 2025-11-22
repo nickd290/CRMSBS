@@ -646,9 +646,9 @@ const ChatInterface: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col min-h-full bg-white relative">
       {/* Header */}
-      <div className={`px-4 py-4 md:py-3 border-b border-gray-200 flex items-center justify-between ${isLiveActive ? 'bg-green-50' : 'bg-gray-50'}`}>
+      <div className={`px-4 py-4 md:py-3 border-b border-gray-200 flex items-center justify-between shrink-0 ${isLiveActive ? 'bg-green-50' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2">
             <Database className={`w-5 h-5 md:w-4 md:h-4 ${isLiveActive ? 'text-green-600' : 'text-gray-600'}`} />
             <span className={`text-sm md:text-xs font-semibold uppercase tracking-wider ${isLiveActive ? 'text-green-800' : 'text-gray-600'}`}>
@@ -675,7 +675,7 @@ const ChatInterface: React.FC = () => {
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-4 space-y-4 bg-white">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-4 space-y-4 bg-white">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex items-start max-w-[90%] md:max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>

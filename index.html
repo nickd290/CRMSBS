@@ -3,12 +3,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Starter Box CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body { font-family: 'Inter', sans-serif; }
+
       /* Custom scrollbar for chat */
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -16,6 +19,27 @@
       .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+      }
+
+      /* Safe area support for iPhone notch and home indicator */
+      .safe-area-top {
+          padding-top: env(safe-area-inset-top);
+      }
+      .safe-area-bottom {
+          padding-bottom: env(safe-area-inset-bottom);
+      }
+      .safe-area-left {
+          padding-left: env(safe-area-inset-left);
+      }
+      .safe-area-right {
+          padding-right: env(safe-area-inset-right);
+      }
+
+      /* Fix for iOS viewport height (accounts for address bar) */
+      @supports (-webkit-touch-callout: none) {
+        .min-h-screen {
+          min-height: -webkit-fill-available;
+        }
       }
     </style>
 </head>
