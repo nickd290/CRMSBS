@@ -359,7 +359,7 @@ async function executeToolOnBackend(
           return { error: "Failed to fetch email accounts" };
         }
 
-        const accounts = await accountsRes.json();
+        const accounts = await accountsRes.json() as any[];
         if (!accounts || accounts.length === 0) {
           return {
             error: "No Gmail accounts connected",
@@ -377,7 +377,7 @@ async function executeToolOnBackend(
           return { error: "Failed to fetch emails from Gmail" };
         }
 
-        const emailData = await emailsRes.json();
+        const emailData = await emailsRes.json() as any;
         const messages = emailData.messages || [];
 
         const filteredMessages = unreadOnly
@@ -413,7 +413,7 @@ async function executeToolOnBackend(
           return { error: "Failed to fetch email accounts" };
         }
 
-        const accounts = await accountsRes.json();
+        const accounts = await accountsRes.json() as any[];
         if (!accounts || accounts.length === 0) {
           return {
             error: "No Gmail accounts connected",
@@ -432,7 +432,7 @@ async function executeToolOnBackend(
           return { error: "Failed to search emails" };
         }
 
-        const emailData = await emailsRes.json();
+        const emailData = await emailsRes.json() as any;
         const messages = emailData.messages || [];
 
         return {
