@@ -169,7 +169,7 @@ const Orders: React.FC = () => {
 
         {/* Main Table */}
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px] md:min-w-0">
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                   <tr>
                       {activeStage === 'ready_to_schedule' && (

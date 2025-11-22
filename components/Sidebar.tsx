@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, FileSpreadsheet, Image as ImageIcon, Map, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, FileSpreadsheet, Image as ImageIcon, Map, DollarSign, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -17,13 +17,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
     { id: 'invoices', label: 'Invoices', icon: <DollarSign size={20} /> },
     { id: 'products', label: 'Products', icon: <FileSpreadsheet size={20} /> },
     { id: 'mockups', label: 'Mockups', icon: <ImageIcon size={20} /> },
+    { id: 'emails', label: 'Emails', icon: <Mail size={20} /> },
   ];
 
   return (
-    <div 
-      className={`bg-slate-900 text-gray-300 flex flex-col h-full shrink-0 transition-all duration-300 border-r border-slate-800 relative z-20 ${
-        isCollapsed ? 'w-16' : 'w-64'
-      }`}
+    <div
+      className={`bg-slate-900 text-gray-300 flex flex-col h-full shrink-0 transition-all duration-300 border-r border-slate-800 relative z-40
+        fixed md:relative inset-y-0 left-0
+        ${isCollapsed ? 'w-0 md:w-16 -translate-x-full md:translate-x-0' : 'w-64 translate-x-0'}
+      `}
     >
       {/* Header */}
       <div className={`h-16 flex items-center ${isCollapsed ? 'justify-center' : 'px-6'}`}>
@@ -49,11 +51,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isCollapsed,
         {navItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => {
+              setActiveTab(item.id);
+              // Auto-close sidebar on mobile after selection
+              if (window.innerWidth < 768) toggleCollapse();
+            }}
             title={isCollapsed ? item.label : ''}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-              activeTab === item.id 
-                ? 'bg-green-700/50 text-green-400 shadow-inner border border-green-800/50' 
+            className={`w-full flex items-center gap-3 px-3 py-3 md:py-2.5 rounded-lg transition-all min-h-[44px] md:min-h-0 ${
+              activeTab === item.id
+                ? 'bg-green-700/50 text-green-400 shadow-inner border border-green-800/50'
                 : 'hover:bg-slate-800 hover:text-white'
             } ${isCollapsed ? 'justify-center' : ''}`}
           >

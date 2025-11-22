@@ -1,10 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { ai, createToolDeclarations, getGeminiModel } from '../services/geminiService';
+import { ai, createToolDeclarations } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { Send, User, Bot, Sparkles, Database, Mic, MicOff, XCircle, Volume2, AlertCircle, Activity, Paperclip, X, Image as ImageIcon } from 'lucide-react';
 import { LiveServerMessage, Modality } from '@google/genai';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // --- Audio Helper Functions ---
 function encode(bytes: Uint8Array) {
@@ -200,7 +202,7 @@ const ChatInterface: React.FC = () => {
          const { invoiceId } = args;
          const inv = invoices.find(i => i.id === invoiceId || i.id === `INV-${invoiceId}`);
          if (!inv) return { found: false, message: "Invoice not found" };
-         
+
          // Find associated customer name
          const customer = customers.find(c => c.id === inv.courseId);
          return {
@@ -214,6 +216,114 @@ const ChatInterface: React.FC = () => {
                  paymentUrl: inv.paymentUrl
              }
          };
+
+      } else if (name === 'check_recent_emails') {
+         const { maxResults = 10, unreadOnly = false } = args;
+
+         try {
+           // Fetch connected accounts
+           const accountsRes = await fetch(`${API_BASE}/auth/accounts`);
+           if (!accountsRes.ok) {
+             return { error: "Failed to fetch email accounts. Make sure backend is running." };
+           }
+
+           const accounts = await accountsRes.json();
+           if (!accounts || accounts.length === 0) {
+             return {
+               error: "No Gmail accounts connected",
+               message: "Please connect a Gmail account in the Emails tab first."
+             };
+           }
+
+           const accountId = accounts[0].id;
+           const query = new URLSearchParams({
+             maxResults: Math.min(maxResults, 25).toString()
+           });
+
+           const emailsRes = await fetch(`${API_BASE}/gmail/${accountId}/messages?${query}`);
+           if (!emailsRes.ok) {
+             return { error: "Failed to fetch emails from Gmail" };
+           }
+
+           const emailData = await emailsRes.json();
+           const messages = emailData.messages || [];
+
+           // Filter unread if requested
+           const filteredMessages = unreadOnly
+             ? messages.filter((e: any) => !e.isRead)
+             : messages;
+
+           return {
+             success: true,
+             count: filteredMessages.length,
+             unreadOnly,
+             emails: filteredMessages.map((e: any) => ({
+               from: e.from,
+               subject: e.subject,
+               date: e.date,
+               snippet: e.snippet,
+               isRead: e.isRead
+             }))
+           };
+         } catch (err: any) {
+           return {
+             error: "Email check failed",
+             message: err.message || "Make sure backend server is running on port 3001"
+           };
+         }
+
+      } else if (name === 'search_customer_emails') {
+         const { customerName, maxResults = 20 } = args;
+
+         try {
+           // Fetch connected accounts
+           const accountsRes = await fetch(`${API_BASE}/auth/accounts`);
+           if (!accountsRes.ok) {
+             return { error: "Failed to fetch email accounts" };
+           }
+
+           const accounts = await accountsRes.json();
+           if (!accounts || accounts.length === 0) {
+             return {
+               error: "No Gmail accounts connected",
+               message: "Please connect a Gmail account in the Emails tab first."
+             };
+           }
+
+           const accountId = accounts[0].id;
+
+           // Search emails with customer name in subject or from fields
+           const query = new URLSearchParams({
+             maxResults: maxResults.toString(),
+             q: customerName // Gmail search query
+           });
+
+           const emailsRes = await fetch(`${API_BASE}/gmail/${accountId}/messages?${query}`);
+           if (!emailsRes.ok) {
+             return { error: "Failed to search emails" };
+           }
+
+           const emailData = await emailsRes.json();
+           const messages = emailData.messages || [];
+
+           return {
+             success: true,
+             customerName,
+             count: messages.length,
+             emails: messages.map((e: any) => ({
+               from: e.from,
+               subject: e.subject,
+               date: e.date,
+               snippet: e.snippet,
+               isRead: e.isRead
+             }))
+           };
+         } catch (err: any) {
+           return {
+             error: "Email search failed",
+             message: err.message
+           };
+         }
       }
 
       return { error: "Unknown function" };
@@ -227,14 +337,14 @@ const ChatInterface: React.FC = () => {
   const handleSend = async () => {
     if ((!input.trim() && !attachment) || isLoading) return;
 
-    const userMsg: ChatMessage = { 
-        id: Date.now().toString(), 
-        role: 'user', 
-        text: input, 
+    const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        text: input,
         timestamp: Date.now(),
         image: attachment?.preview
     };
-    
+
     setMessages(prev => [...prev, userMsg]);
     const currentAttachment = attachment; // Capture for async
     setInput('');
@@ -243,93 +353,81 @@ const ChatInterface: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const model = getGeminiModel();
-      
-      const history = messages.filter(m => m.role !== 'system').map(m => {
-        const parts: any[] = [];
-        if (m.image) {
-            // Note: We can't easily reconstruct the base64 from just the preview URL if it was a blob URL
-            // In a real app we would store the base64 in history or re-fetch. 
-            // For this demo, we skip sending old images to history to keep it simple, 
-            // or assume text context is enough.
-            parts.push({ text: `[User sent an image] ${m.text}` }); 
-        } else {
-            parts.push({ text: m.text });
-        }
-        return {
-            role: m.role === 'model' ? 'model' : 'user',
-            parts
+      // Prepare message history for backend
+      const messageHistory = messages.map(m => {
+        const msg: any = {
+          role: m.role,
+          text: m.text
         };
-      });
-
-      const currentParts: any[] = [];
-      if (currentAttachment) {
-          const base64 = await fileToBase64(currentAttachment.file);
-          currentParts.push({
-              inlineData: {
-                  mimeType: currentAttachment.file.type,
-                  data: base64
-              }
-          });
-      }
-      if (userMsg.text) currentParts.push({ text: userMsg.text });
-
-      history.push({ role: 'user', parts: currentParts });
-
-      const tools = [{ functionDeclarations: createToolDeclarations() }];
-
-      const result = await model.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: history,
-        config: { 
-            tools,
-            systemInstruction: `You are the AI Operations Manager for Starter Box Studios. You have access to the CRM database.
-            If the user provides an image, analyze it in the context of golf course products, scorecards, or data entry.
-            Always be concise.`,
+        if (m.image) {
+          msg.image = true;
+          // Note: Previous images are not re-sent as base64, only text context
         }
+        return msg;
       });
 
-      const response = result.candidates?.[0]?.content;
-      const parts = response?.parts || [];
-      let finalResponseText = "";
-      
-      const functionCalls = parts
-        .filter(p => p.functionCall)
-        .map(p => p.functionCall!);
+      // Add current message with attachment if present
+      const currentMsg: any = {
+        role: 'user',
+        text: userMsg.text
+      };
 
-      if (functionCalls.length > 0) {
-         const functionResponses = [];
-
-         for (const call of functionCalls) {
-            const functionResult = await executeTool(call.name, call.args);
-            functionResponses.push({
-              functionResponse: {
-                name: call.name,
-                response: { result: functionResult }
-              }
-            });
-         }
-
-         const result2 = await model.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [
-              ...history,
-              { role: 'model', parts: parts },
-              { role: 'user', parts: functionResponses }
-            ],
-            config: { tools }
-         });
-         
-         finalResponseText = result2.text || "I've completed that request.";
-         await refreshData(); 
-      } else {
-        finalResponseText = result.text || "I couldn't process that request.";
+      if (currentAttachment) {
+        const base64 = await fileToBase64(currentAttachment.file);
+        currentMsg.image = true;
+        currentMsg.imageData = base64;
+        currentMsg.imageMimeType = currentAttachment.file.type;
       }
 
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: finalResponseText, timestamp: Date.now() }]);
+      messageHistory.push(currentMsg);
+
+      // Prepare CRM data for tool execution
+      const crmData = {
+        orders,
+        customers,
+        products,
+        invoices,
+        samples
+      };
+
+      // Call backend AI proxy
+      const response = await fetch(`${API_BASE}/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: messageHistory,
+          crmData
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI service error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const finalResponseText = data.text || "I couldn't process that request.";
+
+      // Refresh data if tools were used that modify data
+      if (data.refreshNeeded) {
+        await refreshData();
+      }
+
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        text: finalResponseText,
+        timestamp: Date.now()
+      }]);
 
     } catch (error: any) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `Error: ${error.message}`, timestamp: Date.now() }]);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        text: `Error: ${error.message}`,
+        timestamp: Date.now()
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -550,10 +648,10 @@ const ChatInterface: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
-      <div className={`px-4 py-3 border-b border-gray-200 flex items-center justify-between ${isLiveActive ? 'bg-green-50' : 'bg-gray-50'}`}>
+      <div className={`px-4 py-4 md:py-3 border-b border-gray-200 flex items-center justify-between ${isLiveActive ? 'bg-green-50' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-2">
-            <Database className={`w-4 h-4 ${isLiveActive ? 'text-green-600' : 'text-gray-600'}`} />
-            <span className={`text-xs font-semibold uppercase tracking-wider ${isLiveActive ? 'text-green-800' : 'text-gray-600'}`}>
+            <Database className={`w-5 h-5 md:w-4 md:h-4 ${isLiveActive ? 'text-green-600' : 'text-gray-600'}`} />
+            <span className={`text-sm md:text-xs font-semibold uppercase tracking-wider ${isLiveActive ? 'text-green-800' : 'text-gray-600'}`}>
                 {isLiveActive ? 'Live Voice Session' : 'Data Assistant'}
             </span>
             {isLiveActive && <span className="flex h-2 w-2 relative ml-2">
@@ -562,8 +660,8 @@ const ChatInterface: React.FC = () => {
             </span>}
         </div>
         {isLiveActive && (
-            <button onClick={stopLiveSession} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
-                <XCircle size={14}/> End Session
+            <button onClick={stopLiveSession} className="text-sm md:text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 min-h-[44px] md:min-h-0 px-2">
+                <XCircle size={16} className="md:w-3.5 md:h-3.5"/> <span className="hidden sm:inline">End Session</span>
             </button>
         )}
       </div>
@@ -577,17 +675,17 @@ const ChatInterface: React.FC = () => {
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 md:p-4 space-y-4 bg-white">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex items-start max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mx-2 mt-1 ${
+            <div className={`flex items-start max-w-[90%] md:max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              <div className={`w-7 h-7 md:w-6 md:h-6 rounded-full flex items-center justify-center shrink-0 mx-2 mt-1 ${
                   msg.role === 'system' ? 'bg-gray-400' :
                   msg.role === 'user' ? 'bg-blue-600' : 'bg-green-600'
               }`}>
-                {msg.role === 'user' ? <User size={12} className="text-white" /> : 
-                 msg.role === 'system' ? <Sparkles size={12} className="text-white" /> :
-                 <Bot size={12} className="text-white" />}
+                {msg.role === 'user' ? <User size={14} className="md:w-3 md:h-3 text-white" /> :
+                 msg.role === 'system' ? <Sparkles size={14} className="md:w-3 md:h-3 text-white" /> :
+                 <Bot size={14} className="md:w-3 md:h-3 text-white" />}
               </div>
               <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   {/* Image Attachment Display */}
@@ -598,8 +696,8 @@ const ChatInterface: React.FC = () => {
                   )}
                   {/* Text Message */}
                   {msg.text && (
-                      <div className={`px-3 py-2 rounded-lg text-sm ${
-                        msg.role === 'system' ? 'bg-gray-100 text-gray-500 italic text-xs' :
+                      <div className={`px-4 py-3 md:px-3 md:py-2 rounded-lg text-base md:text-sm ${
+                        msg.role === 'system' ? 'bg-gray-100 text-gray-500 italic text-sm md:text-xs' :
                         msg.role === 'user' ? 'bg-blue-50 text-blue-900' : 'bg-gray-50 text-gray-800'
                       }`}>
                         {msg.text}
@@ -623,82 +721,82 @@ const ChatInterface: React.FC = () => {
       </div>
 
       {/* Input Area */}
-      <div className="p-3 border-t border-gray-200 bg-white">
+      <div className="p-4 md:p-3 border-t border-gray-200 bg-white safe-area-bottom">
         {/* File Upload Preview */}
         {attachment && (
-             <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200 max-w-fit">
-                 <div className="w-8 h-8 rounded overflow-hidden bg-gray-200">
+             <div className="flex items-center gap-2 mb-3 md:mb-2 px-3 py-2 bg-gray-50 rounded-md border border-gray-200 max-w-fit">
+                 <div className="w-10 h-10 md:w-8 md:h-8 rounded overflow-hidden bg-gray-200">
                      <img src={attachment.preview} alt="Preview" className="w-full h-full object-cover"/>
                  </div>
                  <div className="flex flex-col">
-                     <span className="text-xs text-gray-700 font-medium truncate max-w-[150px]">{attachment.file.name}</span>
-                     <span className="text-[10px] text-gray-500">Attached</span>
+                     <span className="text-sm md:text-xs text-gray-700 font-medium truncate max-w-[150px]">{attachment.file.name}</span>
+                     <span className="text-xs md:text-[10px] text-gray-500">Attached</span>
                  </div>
-                 <button onClick={clearAttachment} className="ml-2 text-gray-400 hover:text-red-500">
-                     <X size={14} />
+                 <button onClick={clearAttachment} className="ml-2 text-gray-400 hover:text-red-500 min-h-[44px] md:min-h-0 px-2">
+                     <X size={18} className="md:w-3.5 md:h-3.5" />
                  </button>
              </div>
         )}
 
         {isLiveActive ? (
-            <div className="flex flex-col items-center justify-center py-4 gap-4 bg-green-50 rounded-lg border border-green-100">
-                <div className="flex items-center gap-4 w-full px-8 justify-center">
+            <div className="flex flex-col items-center justify-center py-6 md:py-4 gap-4 bg-green-50 rounded-lg border border-green-100">
+                <div className="flex items-center gap-6 md:gap-4 w-full px-8 justify-center">
                     {/* User Mic Visualizer */}
                     <div className="flex flex-col items-center gap-1">
-                        <div className="h-10 bg-gray-200 rounded-full w-2 overflow-hidden relative flex items-end">
+                        <div className="h-12 md:h-10 bg-gray-200 rounded-full w-2 overflow-hidden relative flex items-end">
                             <div className="w-full bg-green-500 transition-all duration-75 ease-out rounded-full" style={{ height: `${Math.min(100, audioLevel)}%` }}></div>
                         </div>
-                        <span className="text-[10px] uppercase text-green-700 font-bold">You</span>
+                        <span className="text-xs md:text-[10px] uppercase text-green-700 font-bold">You</span>
                     </div>
 
                     {/* Status Text */}
                     <div className="flex flex-col items-center w-32">
                         {isBotSpeaking ? (
-                            <span className="text-blue-600 text-sm font-bold animate-pulse flex items-center gap-1"><Volume2 size={16}/> Speaking...</span>
+                            <span className="text-blue-600 text-base md:text-sm font-bold animate-pulse flex items-center gap-1"><Volume2 size={20} className="md:w-4 md:h-4"/><span className="hidden sm:inline">Speaking...</span></span>
                         ) : (
-                            <span className="text-green-700 text-sm font-bold">Listening...</span>
+                            <span className="text-green-700 text-base md:text-sm font-bold">Listening...</span>
                         )}
                     </div>
 
-                    {/* Bot Speaking Visualizer (Fake simulation based on state) */}
+                    {/* Bot Speaking Visualizer */}
                     <div className="flex flex-col items-center gap-1">
-                         <div className="h-10 bg-gray-200 rounded-full w-2 overflow-hidden relative flex items-end">
+                         <div className="h-12 md:h-10 bg-gray-200 rounded-full w-2 overflow-hidden relative flex items-end">
                             <div className={`w-full bg-blue-500 transition-all duration-200 rounded-full ${isBotSpeaking ? 'animate-bounce h-3/4' : 'h-0'}`}></div>
                         </div>
-                        <span className="text-[10px] uppercase text-blue-700 font-bold">Bot</span>
+                        <span className="text-xs md:text-[10px] uppercase text-blue-700 font-bold">Bot</span>
                     </div>
                 </div>
 
-                <button 
+                <button
                     onClick={stopLiveSession}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 rounded-full shadow-sm hover:bg-red-50 border border-red-100 transition-colors text-xs font-bold"
+                    className="flex items-center gap-2 px-5 py-3 md:px-4 md:py-2 bg-white text-red-600 rounded-full shadow-sm hover:bg-red-50 border border-red-100 transition-colors text-sm md:text-xs font-bold min-h-[44px] md:min-h-0"
                 >
-                    <MicOff size={14} /> STOP SESSION
+                    <MicOff size={18} className="md:w-3.5 md:h-3.5" /> STOP SESSION
                 </button>
             </div>
         ) : (
             <div className="flex gap-2 items-end">
-                 <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    ref={fileInputRef} 
+                 <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={fileInputRef}
                     onChange={handleAttachmentSelect}
                 />
-                <button 
+                <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-2 rounded-md text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    className="p-3 md:p-2 rounded-md text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
                     title="Attach Image"
                 >
-                    {attachment ? <ImageIcon size={18} className="text-blue-600" /> : <Paperclip size={18} />}
+                    {attachment ? <ImageIcon size={20} className="md:w-4.5 md:h-4.5 text-blue-600" /> : <Paperclip size={20} className="md:w-4.5 md:h-4.5" />}
                 </button>
 
-                <button 
+                <button
                     onClick={startLiveSession}
-                    className="p-2 rounded-md text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors group relative"
+                    className="p-3 md:p-2 rounded-md text-gray-500 hover:bg-gray-100 border border-gray-200 transition-colors group relative min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
                     title="Start Voice Chat"
                 >
-                    <Mic size={18} className="group-hover:text-green-600"/>
+                    <Mic size={20} className="md:w-4.5 md:h-4.5 group-hover:text-green-600"/>
                 </button>
                 <input
                     type="text"
@@ -706,14 +804,14 @@ const ChatInterface: React.FC = () => {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     placeholder="Type or use voice..."
-                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:bg-white text-sm transition-all"
+                    className="flex-1 px-4 py-3 md:px-3 md:py-2 bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:bg-white text-base md:text-sm transition-all min-h-[44px] md:min-h-0"
                 />
-                <button 
+                <button
                     onClick={handleSend}
                     disabled={isLoading}
-                    className={`p-2 rounded-md text-white transition-colors shrink-0 ${isLoading ? 'bg-gray-300' : 'bg-green-600 hover:bg-green-700'}`}
+                    className={`p-3 md:p-2 rounded-md text-white transition-colors shrink-0 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center ${isLoading ? 'bg-gray-300' : 'bg-green-600 hover:bg-green-700'}`}
                 >
-                    <Send size={16} />
+                    <Send size={20} className="md:w-4 md:h-4" />
                 </button>
             </div>
         )}

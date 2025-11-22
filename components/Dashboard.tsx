@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
                 <FileSpreadsheet size={64} />
@@ -82,12 +82,12 @@ const Dashboard: React.FC = () => {
 
       {/* Recent Sheet Activity Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h3 className="font-semibold text-gray-800">Recent Order Rows</h3>
-            <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded">Tab: Orders</span>
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h3 className="font-semibold text-gray-800 text-base md:text-base">Recent Orders</h3>
+            <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded hidden sm:inline">Tab: Orders</span>
         </div>
         <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-500">
+            <table className="w-full text-sm text-left text-gray-500 min-w-[600px] md:min-w-0">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                     <tr>
                         <th className="px-6 py-3">Order ID</th>

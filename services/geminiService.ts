@@ -1,7 +1,14 @@
+/**
+ * Gemini Service (Frontend - Voice Chat Only)
+ *
+ * NOTE: Text chat now uses the backend AI proxy at /api/ai/chat
+ * This service is only used for Live Voice API functionality
+ * The API key is exposed in frontend bundle - for production, consider moving voice to backend too
+ */
 
 import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = import.meta.env.VITE_API_KEY || import.meta.env.GEMINI_API_KEY || '';
 export const ai = new GoogleGenAI({ apiKey });
 
 export const createToolDeclarations = (): FunctionDeclaration[] => {
@@ -75,10 +82,30 @@ export const createToolDeclarations = (): FunctionDeclaration[] => {
         },
         required: ["invoiceId"]
       }
+    },
+    {
+      name: "check_recent_emails",
+      description: "Check recent emails from connected Gmail accounts. Returns subject, sender, date, and preview. Useful for 'check my email' or 'any new messages'.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          maxResults: { type: Type.NUMBER, description: "Number of emails to retrieve (default 10, max 25)" },
+          unreadOnly: { type: Type.BOOLEAN, description: "If true, only show unread emails (default false)" }
+        },
+        required: []
+      }
+    },
+    {
+      name: "search_customer_emails",
+      description: "Find all emails related to a specific golf course customer by searching their name or email address.",
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          customerName: { type: Type.STRING, description: "Name of the golf course to search for" },
+          maxResults: { type: Type.NUMBER, description: "Number of emails to retrieve (default 20)" }
+        },
+        required: ["customerName"]
+      }
     }
   ];
-};
-
-export const getGeminiModel = () => {
-  return ai.models;
 };

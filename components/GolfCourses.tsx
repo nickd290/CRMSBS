@@ -181,8 +181,8 @@ const GolfCourses: React.FC = () => {
           </div>
         </div>
 
-        {/* Table View */}
-        <div className="flex-1 overflow-auto">
+        {/* Table View - Desktop */}
+        <div className="flex-1 overflow-auto hidden md:block">
           <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                   <tr>
@@ -196,8 +196,8 @@ const GolfCourses: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                   {filteredCustomers.map(customer => (
-                      <tr 
-                        key={customer.id} 
+                      <tr
+                        key={customer.id}
                         onClick={() => handleCourseSelect(customer)}
                         className="hover:bg-blue-50/50 transition-colors cursor-pointer"
                       >
@@ -219,6 +219,40 @@ const GolfCourses: React.FC = () => {
                   ))}
               </tbody>
           </table>
+        </div>
+
+        {/* Card View - Mobile */}
+        <div className="flex-1 overflow-auto md:hidden">
+          <div className="divide-y divide-gray-200">
+            {filteredCustomers.map(customer => (
+              <button
+                key={customer.id}
+                onClick={() => handleCourseSelect(customer)}
+                className="w-full text-left p-4 hover:bg-blue-50 transition-colors min-h-[80px] flex flex-col gap-2"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 text-base truncate mb-1">
+                      {customer.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 flex items-center gap-1.5 mb-1">
+                      <MapPin size={14} className="shrink-0" />
+                      <span className="truncate">{customer.city}, {customer.state}</span>
+                    </p>
+                    {customer.contactName && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                        <User size={14} className="shrink-0" />
+                        <span className="truncate">{customer.contactName}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-xs font-mono text-gray-400 shrink-0">
+                    #{customer.id}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

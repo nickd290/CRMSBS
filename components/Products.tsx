@@ -77,7 +77,7 @@ const Products: React.FC = () => {
           </div>
 
           <div className="overflow-auto flex-1">
-              <table className="w-full text-left text-sm text-gray-500">
+              <table className="w-full text-left text-sm text-gray-500 min-w-[600px] md:min-w-0">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-700 font-semibold sticky top-0 shadow-sm">
                       <tr>
                           <th className="px-6 py-4">Row</th>

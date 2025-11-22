@@ -435,7 +435,7 @@ const Invoices: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[700px] md:min-w-0">
               <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                   <tr>
                       <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b w-24">Invoice #</th>

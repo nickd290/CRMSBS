@@ -1,0 +1,207 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Gmail Integration Models
+model GmailAccount {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  displayName   String?
+  refreshToken  String    // Encrypted OAuth refresh token
+  accessToken   String?   // Current access token (expires hourly)
+  tokenExpiry   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages      EmailMessage[]
+  @@map("gmail_accounts")
+}
+
+model EmailMessage {
+  id              String    @id @default(uuid())
+  gmailAccountId  String
+  gmailAccount    GmailAccount @relation(fields: [gmailAccountId], references: [id], onDelete: Cascade)
+
+  messageId       String    // Gmail message ID
+  threadId        String    // Gmail thread ID
+  subject         String?
+  from            String
+  to              String
+  cc              String?
+  date            DateTime
+  snippet         String?   // Preview text
+  body            String?   // Full email body
+  isRead          Boolean   @default(false)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customerLinks   EmailCustomerLink[]
+
+  @@unique([gmailAccountId, messageId])
+  @@index([gmailAccountId, date])
+  @@index([threadId])
+  @@map("email_messages")
+}
+
+model EmailCustomerLink {
+  id              String    @id @default(uuid())
+  emailMessageId  String
+  emailMessage    EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  matchType       String    // "domain", "exact", "manual"
+  createdAt       DateTime  @default(now())
+
+  @@unique([emailMessageId, customerId])
+  @@map("email_customer_links")
+}
+
+// CRM Models
+model Customer {
+  id              String    @id @default(uuid())
+  name            String
+  email           String?
+  phone           String?
+  address         String?
+  city            String?
+  state           String?
+  zip             String?
+
+  // Golf course specific
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  orders          Order[]
+  invoices        Invoice[]
+  mockups         Mockup[]
+  samples         Sample[]
+  emailLinks      EmailCustomerLink[]
+
+  @@map("customers")
+}
+
+model Product {
+  id              String    @id @default(uuid())
+  sku             String    @unique
+  name            String
+  description     String?
+  price           Float
+  stockLevel      Int       @default(0)
+  category        String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id              String    @id @default(uuid())
+  jobNo           String    @unique
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+
+  customerPO      String?
+  status          String    // "Pending", "In Production", "Shipped", "Completed"
+  total           Float
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  items           OrderItem[]
+  invoices        Invoice[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String    @id @default(uuid())
+  orderId         String
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId       String?
+  product         Product?  @relation(fields: [productId], references: [id])
+
+  description     String
+  quantity        Int
+  unitPrice       Float
+  total           Float
+
+  @@map("order_items")
+}
+
+model Invoice {
+  id              String    @id @default(uuid())
+  invoiceNo       String    @unique
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+
+  orderId         String?
+  order           Order?    @relation(fields: [orderId], references: [id])
+
+  amount          Float
+  status          String    // "Pending", "Paid", "Overdue"
+  dueDate         DateTime?
+  paidDate        DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("invoices")
+}
+
+model Mockup {
+  id              String    @id @default(uuid())
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+
+  title           String
+  version         String?
+  status          String    // "Pending", "Approved", "Rejected", "Revisions Needed"
+  ziflowUrl       String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  approvedAt      DateTime?
+
+  @@map("mockups")
+}
+
+model Sample {
+  id              String    @id @default(uuid())
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+
+  items           String
+  address         String
+  status          String    // "Pending", "Shipped", "Delivered"
+  trackingNo      String?
+
+  requestedAt     DateTime  @default(now())
+  shippedAt       DateTime?
+
+  @@map("samples")
+}
