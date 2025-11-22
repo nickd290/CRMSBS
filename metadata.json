@@ -1,0 +1,7 @@
+{
+  "name": "Starter Box CRM",
+  "description": "An internal CRM for Starter Box Studios featuring an AI-powered conversational interface for order processing, inventory, and mockup tracking.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
