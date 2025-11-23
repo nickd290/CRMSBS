@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [mobileChoice, setMobileChoice] = useState<'chat' | 'dashboard' | null>(() => {
     // Desktop users bypass mobile choice
     if (typeof window !== 'undefined' && window.innerWidth >= 768) {
@@ -39,6 +40,40 @@ const App: React.FC = () => {
     const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
     if (!hasSeenWelcome) {
       setShowWelcome(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Check URL params for OAuth success/error
+    const urlParams = new URLSearchParams(window.location.search);
+    const successParam = urlParams.get('success');
+    const errorParam = urlParams.get('error');
+    const accountId = urlParams.get('account');
+
+    if (successParam === 'true') {
+      setNotification({
+        type: 'success',
+        message: `Gmail account connected successfully!${accountId ? ` Account ID: ${accountId}` : ''}`
+      });
+      setActiveTab('emails'); // Switch to emails tab
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
+    } else if (errorParam) {
+      let errorMessage = 'Failed to connect Gmail account.';
+      if (errorParam === 'auth_failed') {
+        errorMessage = 'Gmail authentication failed. Please check the Railway logs for details and try again.';
+      }
+      setNotification({
+        type: 'error',
+        message: errorMessage
+      });
+      setActiveTab('emails'); // Switch to emails tab to show the error in context
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Auto-dismiss after 10 seconds for errors
+      setTimeout(() => setNotification(null), 10000);
     }
   }, []);
 
@@ -71,6 +106,23 @@ const App: React.FC = () => {
     <CRMProvider>
       {/* Welcome Screen */}
       {showWelcome && <WelcomeScreen onDismiss={handleWelcomeDismiss} />}
+
+      {/* Notification Banner */}
+      {notification && (
+        <div className={`fixed top-0 left-0 right-0 z-50 p-4 text-white text-center ${
+          notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`}>
+          <div className="flex items-center justify-center gap-2">
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex min-h-screen md:h-screen md:overflow-hidden bg-gray-100 font-sans text-sm">
         {/* Mobile Sidebar Backdrop */}

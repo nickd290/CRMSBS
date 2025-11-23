@@ -35,6 +35,7 @@ const Emails: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [replying, setReplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Compose/Reply form state
   const [composeForm, setComposeForm] = useState({
@@ -57,25 +58,38 @@ const Emails: React.FC = () => {
 
   const fetchAccounts = async () => {
     try {
+      setError(null);
       const res = await fetch(`${API_BASE}/auth/accounts`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch accounts: ${res.status} ${res.statusText}`);
+      }
       const data = await res.json();
       setAccounts(data);
       if (data.length > 0 && !activeAccount) {
         setActiveAccount(data[0].id);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch Gmail accounts';
       console.error('Error fetching accounts:', error);
+      setError(errorMessage);
     }
   };
 
   const fetchMessages = async (accountId: string) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`${API_BASE}/gmail/${accountId}/messages?maxResults=25`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch messages: ${res.status} ${res.statusText}`);
+      }
       const data = await res.json();
       setMessages(data.messages || []);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch messages';
       console.error('Error fetching messages:', error);
+      setError(errorMessage);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -83,12 +97,18 @@ const Emails: React.FC = () => {
 
   const fetchMessageDetail = async (accountId: string, messageId: string) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`${API_BASE}/gmail/${accountId}/messages/${messageId}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch message: ${res.status} ${res.statusText}`);
+      }
       const data = await res.json();
       setSelectedMessage(data);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch message details';
       console.error('Error fetching message detail:', error);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -96,13 +116,19 @@ const Emails: React.FC = () => {
 
   const handleConnectAccount = async () => {
     try {
+      setError(null);
       const res = await fetch(`${API_BASE}/auth/gmail`);
+      if (!res.ok) {
+        throw new Error(`Failed to initiate OAuth: ${res.status} ${res.statusText}`);
+      }
       const data = await res.json();
       window.open(data.authUrl, '_blank');
       // Poll for new accounts after authorization
       setTimeout(() => fetchAccounts(), 3000);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect Gmail account';
       console.error('Error initiating OAuth:', error);
+      setError(errorMessage);
     }
   };
 
@@ -170,6 +196,26 @@ const Emails: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-800">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-600 hover:text-red-800 p-1"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-3">

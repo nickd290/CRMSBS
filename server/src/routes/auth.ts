@@ -34,20 +34,42 @@ router.get('/gmail', (req, res) => {
 router.get('/gmail/callback', async (req, res) => {
   const { code } = req.query;
 
+  console.log('📧 Gmail OAuth callback received');
+  console.log('  Code present:', !!code);
+  console.log('  Code type:', typeof code);
+  console.log('  Code prefix:', code ? String(code).substring(0, 10) + '...' : 'N/A');
+
   if (!code || typeof code !== 'string') {
+    console.error('❌ OAuth callback failed: No authorization code provided');
     return res.status(400).json({ error: 'No authorization code provided' });
   }
 
   try {
     // Exchange code for tokens
+    console.log('🔄 Exchanging authorization code for tokens...');
     const { tokens } = await oauth2Client.getToken(code);
+    console.log('✅ Token exchange successful');
+    console.log('  Access token present:', !!tokens.access_token);
+    console.log('  Refresh token present:', !!tokens.refresh_token);
+    console.log('  Token expiry:', tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'N/A');
+
+    if (!tokens.refresh_token) {
+      console.warn('⚠️  Warning: No refresh token received. User may need to reauthorize.');
+    }
+
     oauth2Client.setCredentials(tokens);
 
     // Get user info
+    console.log('👤 Fetching user info from Google...');
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
+    console.log('✅ User info retrieved');
+    console.log('  Email:', userInfo.data.email);
+    console.log('  Name:', userInfo.data.name);
+    console.log('  User ID:', userInfo.data.id);
 
     // Store account in database
+    console.log('💾 Storing account in database...');
     const account = await prisma.gmailAccount.upsert({
       where: { email: userInfo.data.email! },
       update: {
@@ -64,12 +86,31 @@ router.get('/gmail/callback', async (req, res) => {
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null
       }
     });
+    console.log('✅ Account saved to database');
+    console.log('  Account ID:', account.id);
+    console.log('  Email:', account.email);
 
     // Redirect to frontend with success
-    res.redirect(`${process.env.FRONTEND_URL}/emails?success=true&account=${account.id}`);
+    const redirectUrl = `${process.env.FRONTEND_URL}/emails?success=true&account=${account.id}`;
+    console.log('🔄 Redirecting to frontend:', redirectUrl);
+    res.redirect(redirectUrl);
   } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/emails?error=auth_failed`);
+    console.error('❌ OAuth callback error - Full details:');
+    console.error('  Error name:', error instanceof Error ? error.name : 'Unknown');
+    console.error('  Error message:', error instanceof Error ? error.message : String(error));
+    console.error('  Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+    if (error instanceof Error && 'code' in error) {
+      console.error('  Error code:', (error as any).code);
+    }
+
+    if (error instanceof Error && 'response' in error) {
+      console.error('  API Response:', (error as any).response?.data || 'No response data');
+    }
+
+    const errorRedirectUrl = `${process.env.FRONTEND_URL}/emails?error=auth_failed`;
+    console.log('🔄 Redirecting to frontend with error:', errorRedirectUrl);
+    res.redirect(errorRedirectUrl);
   }
 });
 
