@@ -41,11 +41,12 @@ app.use((req, res, next) => {
 
   // Capture the original res.redirect to log redirects
   const originalRedirect = res.redirect.bind(res);
-  res.redirect = function(url: string) {
+  res.redirect = function(...args: any[]) {
     const duration = Date.now() - start;
+    const url = typeof args[0] === 'number' ? args[1] : args[0];
     console.log(`🔄 [${requestId}] REDIRECT ${req.method} ${req.path} → ${url} (${duration}ms)`);
-    return originalRedirect(url);
-  };
+    return originalRedirect(...args);
+  } as any;
 
   next();
 });
